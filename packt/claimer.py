@@ -57,12 +57,13 @@ def get_all_books_data(api_client):
 
         logger.info("Books data has been successfully fetched.")
         return my_books_data
-    except (AttributeError, TypeError):
-        logger.error("Couldn't fetch user's books data.")
+    except (AttributeError, TypeError) as e:
+        logger.error("Couldn't fetch user's books data: {}".format(e))
         return []
 
 
 def _extract_offer_data(free_learning_html):
+    """Return (offer_id, product_id) parsed from the Free Learning page html."""
     offer_id_match = re.search(r'offerId="([^"]+)"', free_learning_html)
     offer_id = offer_id_match.group(1) if offer_id_match else None
 
@@ -88,11 +89,7 @@ def claim_product(api_client, recaptcha_solution):
 
     product_response = api_client.get(PACKT_PRODUCT_SUMMARY_URL.format(product_id=product_id))
     product_json = product_response.json() if product_response.status_code == 200 else {}
-    product_title = (
-        ((product_json.get("data") or {}).get("title"))
-        or product_json.get("title")
-        or "Unknown title"
-    )
+    product_title = (product_json.get("data") or {}).get("title") or product_json.get("title") or "Unknown title"
     product_data = {"id": product_id, "title": product_title}
 
     if any(product_id == book["id"] for book in get_all_books_data(api_client)):
