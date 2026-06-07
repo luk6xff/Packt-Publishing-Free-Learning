@@ -65,7 +65,13 @@ PACKT_FILE_FORMAT_MAPPING = {
 
 def get_product_download_url(product_id, file_type):
     if file_type not in PACKT_FILE_FORMAT_MAPPING:
-        raise ValueError('Unsupported format "{}" for product {}'.format(file_type, product_id))
+        raise ValueError(
+            'Unsupported format "{}" for product {}. Supported formats: {}'.format(
+                file_type,
+                product_id,
+                ', '.join(PACKT_FILE_FORMAT_MAPPING.keys())
+            )
+        )
     return PACKT_API_PRODUCT_FILE_DOWNLOAD_URL.format(
         product_id=product_id,
         file_type=PACKT_FILE_FORMAT_MAPPING[file_type]

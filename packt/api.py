@@ -21,6 +21,7 @@ class PacktAPIClient:
     """Packt API client making API requests on script's behalf."""
 
     def __init__(self, credentials):
+        # Packt currently blocks plain requests-based clients frequently; browser impersonation is required.
         self.session = requests.Session(impersonate="chrome", timeout=60)
         self.credentials = credentials
         self.login()
@@ -30,7 +31,7 @@ class PacktAPIClient:
         try:
             response = self.session.post(PACKT_API_LOGIN_URL, json=self.credentials)
             if response.status_code != 200:
-                raise RuntimeError("login failed with status {}".format(response.status_code))
+                raise RuntimeError("login failed with status {}: {}".format(response.status_code, response.text))
             logger.info("Logged in to Packt successfully!")
         except Exception as e:
             logger.error("Logging in to Packt account failed! {}".format(e))

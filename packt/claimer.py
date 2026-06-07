@@ -71,8 +71,15 @@ def _extract_offer_data(free_learning_html):
     if not product_id_match:
         product_id_match = re.search(r'metaProductId\s*=\s*"([^"]+)"', free_learning_html)
     product_id = product_id_match.group(1) if product_id_match else None
+    if not offer_id or not product_id:
+        logger.warning("Couldn't parse current Free Learning offer data from page source.")
 
     return offer_id, product_id
+
+
+def _extract_product_title(product_json):
+    data = product_json.get("data") or {}
+    return data.get("title") or product_json.get("title") or "Unknown title"
 
 
 def claim_product(api_client, recaptcha_solution):
@@ -89,7 +96,7 @@ def claim_product(api_client, recaptcha_solution):
 
     product_response = api_client.get(PACKT_PRODUCT_SUMMARY_URL.format(product_id=product_id))
     product_json = product_response.json() if product_response.status_code == 200 else {}
-    product_title = (product_json.get("data") or {}).get("title") or product_json.get("title") or "Unknown title"
+    product_title = _extract_product_title(product_json)
     product_data = {"id": product_id, "title": product_title}
 
     if any(product_id == book["id"] for book in get_all_books_data(api_client)):
