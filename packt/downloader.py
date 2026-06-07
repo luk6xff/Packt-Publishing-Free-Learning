@@ -54,15 +54,33 @@ def wait_for_computation(predicate, timeout, retry_after):
     return wrapper
 
 
+PACKT_FILE_FORMAT_MAPPING = {
+    'code': 'code_bundle',
+    'epub': 'epub',
+    'mobi': 'mobi',
+    'pdf': 'ebook',
+    'video': 'video_zip',
+}
+
+
+def get_product_download_url(product_id, file_type):
+    return PACKT_API_PRODUCT_FILE_DOWNLOAD_URL.format(
+        product_id=product_id,
+        file_type=PACKT_FILE_FORMAT_MAPPING[file_type]
+    )
+
+
 @wait_for_computation(lambda _: all(_.values()), 15.0, 0.75)
-def get_product_download_urls(api_client, product_id):
+def get_product_download_urls(api_client, product_id, formats):
     error_message = 'Couldn\'t fetch download URLs for product {}.'.format(product_id)
     try:
         response = api_client.get(PACKT_API_PRODUCT_FILE_TYPES_URL.format(product_id=product_id))
         if response.status_code == 200:
             return {
-                format: PACKT_API_PRODUCT_FILE_DOWNLOAD_URL.format(product_id=product_id, file_type=format)
+                file_type: get_product_download_url(product_id, file_type)
                 for format in response.json().get('data')[0].get('fileTypes')
+                for file_type in [format]
+                if file_type in formats
             }
         else:
             logger.info(error_message)
@@ -76,9 +94,9 @@ def download_products(api_client, download_directory, formats, product_list, int
     nr_of_books_downloaded = 0
     is_interactive = sys.stdout.isatty()
     for book in product_list:
-        download_urls = get_product_download_urls(api_client, book['id'])
+        download_urls = get_product_download_urls(api_client, book['id'], formats)
         for format, download_url in download_urls.items():
-            if format in formats and not (format == 'code' and 'video' in download_urls and 'video' in formats):
+            if not (format == 'code' and 'video' in download_urls and 'video' in formats):
                 file_extention = 'zip' if format in ('video', 'code') else format
                 file_name = slugify_product_name(book['title'])
                 logger.info('Title: "{}"'.format(book['title']))
@@ -100,8 +118,7 @@ def download_products(api_client, download_directory, formats, product_list, int
                     else:
                         logger.info('Downloading ebook: "{}" in {} format...'.format(book['title'], format))
                     try:
-                        file_url = api_client.get(download_url).json().get('data')
-                        r = api_client.get(file_url, timeout=100, stream=True)
+                        r = api_client.get(download_url, timeout=100, stream=True)
                         if r.status_code == 200:
                             try:
                                 with open(temp_file_path, 'wb') as f:

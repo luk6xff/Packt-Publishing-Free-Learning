@@ -1,102 +1,116 @@
-import datetime as dt
-from itertools import chain
-from math import ceil
-from operator import itemgetter
+import re
 
 from .api import (
     DEFAULT_PAGINATION_SIZE,
     PACKT_API_FREE_LEARNING_CLAIM_URL,
-    PACKT_API_FREE_LEARNING_OFFERS_URL,
     PACKT_API_PRODUCTS_URL,
-    PACKT_API_USER_URL,
-    PACKT_PRODUCT_SUMMARY_URL
+    PACKT_PRODUCT_SUMMARY_URL,
 )
 from .utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+PACKT_FREE_LEARNING_URL = "https://www.packtpub.com/free-learning"
+
+
+def fetch_all_books_data(api_client, offset=0, data_acc=None):
+    """Fetch all pages from user's owned products endpoint."""
+    data_acc = data_acc if data_acc is not None else []
+
+    response = api_client.get(
+        PACKT_API_PRODUCTS_URL,
+        params={
+            "sort": "createdAt:desc",
+            "offset": offset,
+            "limit": DEFAULT_PAGINATION_SIZE,
+        },
+    )
+    response_json = response.json()
+    books = response_json.get("data") or []
+    total = response_json.get("count")
+
+    data_acc.extend(books)
+
+    # If total isn't present, stop when page size drops below requested limit.
+    if total is None:
+        if len(books) < DEFAULT_PAGINATION_SIZE:
+            return data_acc
+        return fetch_all_books_data(api_client, offset + DEFAULT_PAGINATION_SIZE, data_acc)
+
+    if offset + DEFAULT_PAGINATION_SIZE >= total:
+        return data_acc
+
+    return fetch_all_books_data(api_client, offset + DEFAULT_PAGINATION_SIZE, data_acc)
 
 
 def get_all_books_data(api_client):
     """Fetch all user's ebooks data."""
     logger.info("Getting your books data...")
     try:
-        response = api_client.get(PACKT_API_PRODUCTS_URL)
-        pages_total = int(ceil(response.json().get('count') / DEFAULT_PAGINATION_SIZE))
+        all_books = fetch_all_books_data(api_client)
 
         ids, my_books_data = (set(), [])
-        for book in chain(*map(lambda page: get_single_page_books_data(api_client, page), range(pages_total))):
-            if book['id'] not in ids:
-                ids.add(book['id'])
-                my_books_data.append(book)
+        for book in all_books:
+            product_id = book.get("productId") or book.get("id")
+            title = book.get("productName") or book.get("title")
+            if product_id and title and product_id not in ids:
+                ids.add(product_id)
+                my_books_data.append({"id": product_id, "title": title})
 
-        logger.info('Books data has been successfully fetched.')
+        logger.info("Books data has been successfully fetched.")
         return my_books_data
     except (AttributeError, TypeError):
-        logger.error('Couldn\'t fetch user\'s books data.')
+        logger.error("Couldn't fetch user's books data.")
+        return []
 
 
-def get_single_page_books_data(api_client, page):
-    """Fetch ebooks data from single products API pagination page."""
-    try:
-        response = api_client.get(
-            PACKT_API_PRODUCTS_URL,
-            params={
-                'sort': 'createdAt:DESC',
-                'offset': DEFAULT_PAGINATION_SIZE * page,
-                'limit': DEFAULT_PAGINATION_SIZE
-            }
-        )
-        return [{'id': t['productId'], 'title': t['productName']} for t in response.json().get('data')]
-    except Exception:
-        logger.error('Couldn\'t fetch page {} of user\'s books data.'.format(page))
+def _extract_offer_data(free_learning_html):
+    offer_id_match = re.search(r'offerId="(.*?)"', free_learning_html)
+    offer_id = offer_id_match.group(1) if offer_id_match else None
+
+    product_id_match = re.search(r"const metaProductId = '(.*?)';", free_learning_html)
+    if not product_id_match:
+        product_id_match = re.search(r'metaProductId\s*=\s*"(.*?)"', free_learning_html)
+    product_id = product_id_match.group(1) if product_id_match else None
+
+    return offer_id, product_id
 
 
 def claim_product(api_client, recaptcha_solution):
     """Grab Packt Free Learning ebook."""
     logger.info("Start grabbing ebook...")
 
-    utc_today = dt.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    offer_response = api_client.get(
-        PACKT_API_FREE_LEARNING_OFFERS_URL,
-        params={
-            'dateFrom': utc_today.isoformat(),
-            'dateTo': (utc_today + dt.timedelta(days=1)).isoformat()
-        }
-    )
+    free_learning_html = api_client.get(PACKT_FREE_LEARNING_URL).text
+    offer_id, product_id = _extract_offer_data(free_learning_html)
+
     # Handle case when there is no Free Learning offer
-    offer_count = offer_response.json().get('count')
-    if offer_count == 0:
+    if not offer_id or not product_id:
         logger.info("There is no Free Learning offer right now")
         raise Exception("There is no Free Learning offer right now")
 
-    # Sometimes they are several offers. We just get the last updated one.
-    offer_data = max(offer_response.json().get('data'), key=itemgetter('updatedAt'))
-
-    offer_id = offer_data.get('id')
-    product_id = offer_data.get('productId')
-
-    user_response = api_client.get(PACKT_API_USER_URL)
-    [user_data] = user_response.json().get('data')
-    user_id = user_data.get('id')
-
     product_response = api_client.get(PACKT_PRODUCT_SUMMARY_URL.format(product_id=product_id))
-    product_data = {'id': product_id, 'title': product_response.json()['title']}\
-        if product_response.status_code == 200 else None
+    product_json = product_response.json() if product_response.status_code == 200 else {}
+    product_title = (
+        ((product_json.get("data") or {}).get("title"))
+        or product_json.get("title")
+        or "Unknown title"
+    )
+    product_data = {"id": product_id, "title": product_title}
 
-    if any(product_id == book['id'] for book in get_all_books_data(api_client)):
-        logger.info('You have already claimed Packt Free Learning "{}" offer.'.format(product_data['title']))
+    if any(product_id == book["id"] for book in get_all_books_data(api_client)):
+        logger.info('You have already claimed Packt Free Learning "{}" offer.'.format(product_data["title"]))
         return product_data
 
-    claim_response = api_client.put(
-        PACKT_API_FREE_LEARNING_CLAIM_URL.format(user_id=user_id, offer_id=offer_id),
-        json={'recaptcha': recaptcha_solution}
+    claim_response = api_client.post(
+        PACKT_API_FREE_LEARNING_CLAIM_URL.format(offer_id=offer_id),
+        json={"recaptcha": recaptcha_solution},
     )
 
     if claim_response.status_code == 200:
-        logger.info('A new Packt Free Learning ebook "{}" has been grabbed!'.format(product_data['title']))
+        logger.info('A new Packt Free Learning ebook "{}" has been grabbed!'.format(product_data["title"]))
     elif claim_response.status_code == 409:
-        logger.info('You have already claimed Packt Free Learning "{}" offer.'.format(product_data['title']))
+        logger.info('You have already claimed Packt Free Learning "{}" offer.'.format(product_data["title"]))
     else:
-        logger.error('Claiming Packt Free Learning book has failed.')
+        logger.error("Claiming Packt Free Learning book has failed.")
 
     return product_data
