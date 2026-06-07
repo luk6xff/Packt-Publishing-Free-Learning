@@ -17,30 +17,28 @@ def fetch_all_books_data(api_client, offset=0, data_acc=None):
     """Fetch all pages from user's owned products endpoint."""
     data_acc = data_acc if data_acc is not None else []
 
-    response = api_client.get(
-        PACKT_API_PRODUCTS_URL,
-        params={
-            "sort": "createdAt:desc",
-            "offset": offset,
-            "limit": DEFAULT_PAGINATION_SIZE,
-        },
-    )
-    response_json = response.json()
-    books = response_json.get("data") or []
-    total = response_json.get("count")
+    while True:
+        response = api_client.get(
+            PACKT_API_PRODUCTS_URL,
+            params={
+                "sort": "createdAt:desc",
+                "offset": offset,
+                "limit": DEFAULT_PAGINATION_SIZE,
+            },
+        )
+        response_json = response.json()
+        books = response_json.get("data") or []
+        total = response_json.get("count")
+        data_acc.extend(books)
 
-    data_acc.extend(books)
-
-    # If total isn't present, stop when page size drops below requested limit.
-    if total is None:
-        if len(books) < DEFAULT_PAGINATION_SIZE:
+        # If total isn't present, stop when page size drops below requested limit.
+        if total is None:
+            if len(books) < DEFAULT_PAGINATION_SIZE:
+                return data_acc
+        elif offset + DEFAULT_PAGINATION_SIZE >= total:
             return data_acc
-        return fetch_all_books_data(api_client, offset + DEFAULT_PAGINATION_SIZE, data_acc)
 
-    if offset + DEFAULT_PAGINATION_SIZE >= total:
-        return data_acc
-
-    return fetch_all_books_data(api_client, offset + DEFAULT_PAGINATION_SIZE, data_acc)
+        offset += DEFAULT_PAGINATION_SIZE
 
 
 def get_all_books_data(api_client):

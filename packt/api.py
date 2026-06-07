@@ -14,7 +14,7 @@ PACKT_PRODUCT_SUMMARY_URL = "https://subscription.packtpub.com/api/products/{pro
 PACKT_API_PRODUCT_FILE_TYPES_URL = "https://services.packtpub.com/products-v1/products/{product_id}/types"
 PACKT_API_PRODUCT_FILE_DOWNLOAD_URL = "https://subscription.packtpub.com/download/{product_id}/{file_type}"
 PACKT_API_FREE_LEARNING_CLAIM_URL = "https://www.packtpub.com/api/claim-free-learning/offers/{offer_id}"
-DEFAULT_PAGINATION_SIZE = 250
+DEFAULT_PAGINATION_SIZE = 100
 
 
 class PacktAPIClient:
