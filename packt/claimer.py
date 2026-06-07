@@ -65,12 +65,12 @@ def get_all_books_data(api_client):
 
 
 def _extract_offer_data(free_learning_html):
-    offer_id_match = re.search(r'offerId="(.*?)"', free_learning_html)
+    offer_id_match = re.search(r'offerId="([^"]+)"', free_learning_html)
     offer_id = offer_id_match.group(1) if offer_id_match else None
 
-    product_id_match = re.search(r"const metaProductId = '(.*?)';", free_learning_html)
+    product_id_match = re.search(r"const metaProductId = '([^']+)';", free_learning_html)
     if not product_id_match:
-        product_id_match = re.search(r'metaProductId\s*=\s*"(.*?)"', free_learning_html)
+        product_id_match = re.search(r'metaProductId\s*=\s*"([^"]+)"', free_learning_html)
     product_id = product_id_match.group(1) if product_id_match else None
 
     return offer_id, product_id
