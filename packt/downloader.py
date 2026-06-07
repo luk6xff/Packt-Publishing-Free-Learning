@@ -84,9 +84,14 @@ def get_product_download_urls(api_client, product_id, formats):
     try:
         response = api_client.get(PACKT_API_PRODUCT_FILE_TYPES_URL.format(product_id=product_id))
         if response.status_code == 200:
+            payload = response.json()
+            data = payload.get('data') or []
+            if not data or not data[0].get('fileTypes'):
+                logger.info(error_message)
+                return {}
             return {
                 file_type: get_product_download_url(product_id, file_type)
-                for file_type in response.json().get('data')[0].get('fileTypes')
+                for file_type in data[0].get('fileTypes')
                 if file_type in formats
             }
         else:
