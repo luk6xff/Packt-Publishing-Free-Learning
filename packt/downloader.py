@@ -108,6 +108,7 @@ def download_products(api_client, download_directory, formats, product_list, int
     for book in product_list:
         download_urls = get_product_download_urls(api_client, book['id'], formats)
         for format, download_url in download_urls.items():
+            # Skip code bundle if video bundle is requested too - both contain the source assets.
             if not (format == 'code' and 'video' in download_urls and 'video' in formats):
                 file_extention = 'zip' if format in ('video', 'code') else format
                 file_name = slugify_product_name(book['title'])

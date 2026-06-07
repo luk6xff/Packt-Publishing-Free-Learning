@@ -22,7 +22,7 @@ class PacktAPIClient:
 
     def __init__(self, credentials):
         # Packt currently blocks plain requests-based clients frequently; browser impersonation is required.
-        self.session = requests.Session(impersonate="chrome", timeout=60)
+        self.session = requests.Session(impersonate="chrome")
         self.credentials = credentials
         self.login()
 
@@ -39,6 +39,7 @@ class PacktAPIClient:
 
     def request(self, method, url, **kwargs):
         """Make a request to a Packt API."""
+        kwargs.setdefault("timeout", 60)
         response = self.session.request(method, url, **kwargs)
         if response.status_code == 401:
             # Login again to refresh session cookies and retry request
