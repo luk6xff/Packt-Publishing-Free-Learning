@@ -5,7 +5,7 @@
 ## Free Learning Packt Publishing script
 
 `packt-cli` is a Python script that allows to automatically grab and download a daily Free
-Learning Packt ebook from https://www.packtpub.com/packt/offers/free-learning.
+Learning Packt ebook from https://www.packtpub.com/free-learning.
 You can also use it to download already claimed ebooks from your Packt
 account.
 
