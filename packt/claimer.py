@@ -64,7 +64,7 @@ def get_all_books_data(api_client):
 
         logger.info("Books data has been successfully fetched.")
         return my_books_data
-    except (AttributeError, TypeError) as e:
+    except (AttributeError, TypeError, ValueError) as e:
         logger.error("Couldn't fetch user's books data: {}".format(e))
         return []
 
