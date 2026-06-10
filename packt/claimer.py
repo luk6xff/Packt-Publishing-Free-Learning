@@ -26,7 +26,14 @@ def fetch_all_books_data(api_client, offset=0, data_acc=None):
                 "limit": DEFAULT_PAGINATION_SIZE,
             },
         )
-        response_json = response.json()
+        if response.status_code != 200:
+            logger.error("Couldn't fetch user's books data (status {}).".format(response.status_code))
+            return data_acc
+        try:
+            response_json = response.json()
+        except ValueError as e:
+            logger.error("Couldn't parse user's books data response: {}".format(e))
+            return data_acc
         books = response_json.get("data") or []
         total = response_json.get("count")
         data_acc.extend(books)
