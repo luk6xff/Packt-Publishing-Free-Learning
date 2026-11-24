@@ -29,8 +29,7 @@ class PacktAPIClient:
     def login(self):
         """Log user into Packt and initialize authenticated session cookies."""
         try:
-            payload = dict(self.credentials)
-            payload.pop("recaptcha", None)
+            payload = {key: self.credentials[key] for key in ("username", "password")}
             response = self.session.post(PACKT_API_LOGIN_URL, json=payload)
             if response.status_code != 200:
                 raise RuntimeError("login failed with status {}".format(response.status_code))
